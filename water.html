@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Reminder App</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      background: linear-gradient(135deg, #89f7fe, #66a6ff);
+      padding: 20px;
+      color: #004b8d;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+    .progress-circle {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: conic-gradient(#004b8d var(--percent), #ddd 0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 20px auto;
+      font-size: 18px;
+      font-weight: bold;
+      color: #004b8d;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      transition: background 0.5s ease;
+    }
+    .buttons, .reminders {
+      margin: 20px;
+    }
+    button {
+      padding: 12px 25px;
+      margin: 8px;
+      border: none;
+      border-radius: 12px;
+      background: #004b8d;
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.3s;
+    }
+    button:hover {
+      background: #0066cc;
+      transform: scale(1.05);
+    }
+    input, select {
+      padding: 12px;
+      margin: 8px;
+      border-radius: 10px;
+      border: 2px solid #004b8d;
+      width: 120px;
+      text-align: center;
+      font-size: 15px;
+    }
+    #countdown {
+      font-size: 16px;
+      margin-top: 10px;
+      color: #003366;
+    }
+    footer {
+      margin-top: 30px;
+      font-size: 14px;
+      color: #003366;
+      font-weight: bold;
+    }
+
+    /* Reward Popup */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 15px;
+      width: 300px;
+      text-align: center;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+      animation: pop 0.4s ease;
+    }
+    @keyframes pop {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-content h2 {
+      color: #004b8d;
+    }
+    .close-btn {
+      margin-top: 15px;
+      background: #004b8d;
+      color: white;
+      padding: 8px 15px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .close-btn:hover {
+      background: #0066cc;
+    }
+  </style>
+</head>
+<body>
+  <h1>💧 Stay Hydrated!</h1>
+  <div id="progress" class="progress-circle" style="--percent: 0deg;">
+    0 / 4000 ml
+  </div>
+
+  <div class="buttons">
+    <button onclick="addWater(250)">+250ml</button>
+    <button onclick="addWater(500)">+500ml</button><br>
+    <input type="number" id="customAmount" placeholder="ml">
+    <button onclick="addCustom()">Add</button>
+  </div>
+
+  <div class="reminders">
+    <h3>⏰ Reminder Settings</h3>
+    <select id="intervalSelect">
+      <option value="30">Every 30 min</option>
+      <option value="60" selected>Every 1 hour</option>
+      <option value="120">Every 2 hours</option>
+    </select>
+    <button onclick="startReminders()">Start</button>
+    <button onclick="stopReminders()">Pause</button>
+    <div id="countdown">Next reminder in: --:--</div>
+  </div>
+
+  <footer>
+    🚀 Made with 💙 by <span style="color:#004b8d;">PRANESH M</span>
+  </footer>
+
+  <!-- Reward Modal -->
+  <div id="rewardModal" class="modal">
+    <div class="modal-content">
+      <h2>🎉 Congratulations!</h2>
+      <p id="rewardQuote">You did it!</p>
+      <button class="close-btn" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Sound -->
+  <audio id="reminderSound" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3" preload="auto"></audio>
+
+  <script>
+    const goal = 4000;
+    let current = 0;
+    let reminderInterval;
+    let countdownTimer;
+    let remainingTime = 0;
+
+    const quotes = [
+      "💪 Great job! Consistency is the key to success.",
+      "🌟 You proved you can achieve anything!",
+      "🔥 Hydration hero! Keep shining.",
+      "🚀 Discipline creates results – just like today.",
+      "🌊 You’ve mastered the art of hydration. Cheers!"
+    ];
+
+    function updateProgress() {
+      const percent = (current / goal) * 360;
+      document.getElementById("progress").style.setProperty("--percent", percent + "deg");
+      document.getElementById("progress").innerText = `${current} / ${goal} ml`;
+      
+      if (current >= goal) {
+        showReward();
+      } else if (current >= goal/2 && current < goal) {
+        notify("🔥 Halfway there! Keep going!");
+      }
+    }
+
+    function addWater(amount) {
+      current = Math.min(goal, current + amount);
+      updateProgress();
+      saveProgress();
+    }
+
+    function addCustom() {
+      const input = document.getElementById("customAmount").value;
+      const amount = parseInt(input);
+      if (!isNaN(amount) && amount > 0) {
+        addWater(amount);
+        document.getElementById("customAmount").value = "";
+      }
+    }
+
+    // Notifications
+    function notify(msg) {
+      if (Notification.permission === "granted") {
+        new Notification(msg);
+      }
+    }
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    // Save progress (localStorage)
+    function saveProgress() {
+      localStorage.setItem("waterProgress", JSON.stringify({
+        current: current,
+        date: new Date().toDateString()
+      }));
+    }
+
+    // Load progress on refresh
+    function loadProgress() {
+      let saved = localStorage.getItem("waterProgress");
+      if (saved) {
+        saved = JSON.parse(saved);
+        if (saved.date === new Date().toDateString()) {
+          current = saved.current;
+        } else {
+          current = 0; // reset if new day
+        }
+      }
+      updateProgress();
+    }
+
+    // Reminder System
+    function startReminders() {
+      const minutes = parseInt(document.getElementById("intervalSelect").value);
+      remainingTime = minutes * 60; // seconds
+      clearInterval(reminderInterval);
+      clearInterval(countdownTimer);
+
+      reminderInterval = setInterval(() => {
+        playReminder();
+        remainingTime = minutes * 60;
+      }, minutes * 60000);
+
+      countdownTimer = setInterval(updateCountdown, 1000);
+      updateCountdown();
+    }
+
+    function stopReminders() {
+      clearInterval(reminderInterval);
+      clearInterval(countdownTimer);
+      document.getElementById("countdown").innerText = "⏸ Reminders paused";
+    }
+
+    function updateCountdown() {
+      if (remainingTime > 0) {
+        remainingTime--;
+        const min = Math.floor(remainingTime / 60);
+        const sec = remainingTime % 60;
+        document.getElementById("countdown").innerText =
+          `Next reminder in: ${min}:${sec < 10 ? "0" + sec : sec}`;
+      }
+    }
+
+    function playReminder() {
+      notify("💧 Time to drink water!");
+      document.getElementById("reminderSound").play();
+    }
+
+    // Reward System
+    function showReward() {
+      const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+      document.getElementById("rewardQuote").innerText = randomQuote;
+      document.getElementById("rewardModal").style.display = "flex";
+      notify("🏆 Goal Complete! " + randomQuote);
+    }
+
+    function closeModal() {
+      document.getElementById("rewardModal").style.display = "none";
+    }
+
+    loadProgress();
+  </script>
+</body>
+</html>
